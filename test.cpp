@@ -48,31 +48,37 @@ public:
     }
 };
 
+class MyGA : public GA<Individual<float>>{
+	public:
+	Individual<float> generateValidIndividual() override{
+		std::random_device rd;
+		std::mt19937 gen(rd());
+		std::uniform_real_distribution<> dis(0, 10);
+		return Individual<float>(dis(gen));
+	}
+	float calculateFitness(Individual<float> i) override{
+		float x = i.getPhenotype();
+		return sin(x)*sin(2*x+5);
+	}
 
+	bool isViable(Individual<float> i) override{
+		float x = i.getPhenotype();
+		return x>=0 && x<=10;
+	}
+
+	MyGA(int populationSize, float mutationRate, float elitismRate) : GA(populationSize, mutationRate, elitismRate) {
+		initializePopulation();
+	}
+};
 int main()
 {
 	//testGrayConversion();
 	FloatGenotypePhenotypeStrategy* strategy = new FloatGenotypePhenotypeStrategy();
 	Individual<float>::setStrategy(strategy);
 
-	std::function<float(Individual<float>)> fitness = [](Individual<float> i) {
-		float x = i.getPhenotype();
-		return sin(x)*sin(2*x+5);
-	};
+	
 
-	std::function<bool(Individual<float>)> isViable = [](Individual<float> i) {
-		float x = i.getPhenotype();
-		return x>=0 && x<=10;
-	};
-
-	std::function<Individual<float>()> generateValidIndividual = []() {
-		std::random_device rd;
-		std::mt19937 gen(rd());
-		std::uniform_real_distribution<> dis(0, 10);
-		return Individual<float>(dis(gen));
-	};
-
-	GA<Individual<float>> ga(generateValidIndividual, fitness, isViable, 10, 0.1, 0.1);
+	MyGA ga( 10, 0.1, 0.1);
 
 	for(int i = 0; i < 100; i++)
 	{

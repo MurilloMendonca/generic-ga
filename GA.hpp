@@ -4,10 +4,13 @@
 #include <algorithm>
 #include <functional>
 #include <random>
-
+#include <thread>
 template <typename IndividualType>
 class GA{
-	private:
+	protected:
+		virtual IndividualType generateValidIndividual() = 0;
+		virtual float calculateFitness(IndividualType)=0;
+		virtual bool isViable(IndividualType)=0;
 		std::vector<IndividualType> population;
 		float mutationRate;
 		float elitismRate;
@@ -33,9 +36,27 @@ class GA{
 			}
 		}
 
-		std::function<IndividualType()> generateValidIndividual;
-		std::function<float(IndividualType)> calculateFitness;
-		std::function<bool(IndividualType)> isViable;
+		void evaluatePopulationInParallel(){
+			std::vector<std::thread> threads;
+			for(auto& individual : population)
+			{
+				threads.push_back(std::thread([](IndividualType& individual, GA* ga){
+					if(!ga->isViable(individual))
+					{
+						individual.setFitness(0);
+						return;
+					}
+					
+					individual.setFitness(ga->calculateFitness(individual));
+				}, std::ref(individual), this));
+			}
+			for(auto& thread : threads)
+			{
+				thread.join();
+			}
+		}
+
+		
 
 		void mutatePopulation(){
 			for(auto& individual : population)
@@ -79,22 +100,47 @@ class GA{
 
 			return parents;
 		}
-		std::pair<IndividualType, IndividualType> crossover(IndividualType ind1, IndividualType ind2){
+
+		std::pair<IndividualType, IndividualType> crossover(IndividualType ind1, IndividualType ind2, int numCrossoverPoints=1){
 			std::string genes1 = ind1.getGenotype();
 			std::string genes2 = ind2.getGenotype();
 			//set up random seed
 			std::random_device rd;
 			std::mt19937 gen(rd());
+			std::string newGenes1, newGenes2;
+			int min = genes1.size() < genes2.size() ? genes1.size() : genes2.size();
 
-			std::uniform_int_distribution<> dis(0, genes1.size() - 1);
-			int crossoverPoint = dis(gen);
+			// Generate unique crossover points and sort them
+			std::vector<int> crossoverPoints;
+			std::uniform_int_distribution<> dis(1, min - 1); // avoiding 0 and last index
+			while (crossoverPoints.size() < numCrossoverPoints) {
+				int point = dis(gen);
+				if (std::find(crossoverPoints.begin(), crossoverPoints.end(), point) == crossoverPoints.end()) {
+					crossoverPoints.push_back(point);
+				}
+			}
+			std::sort(crossoverPoints.begin(), crossoverPoints.end());
 
-			std::string newGenes1 = genes1.substr(0, crossoverPoint) + genes2.substr(crossoverPoint, genes2.size() - crossoverPoint);
-			std::string newGenes2 = genes2.substr(0, crossoverPoint) + genes1.substr(crossoverPoint, genes1.size() - crossoverPoint);
+			// Perform n-point crossover
+			int lastPoint = 0;
+			bool switchParent = false;
+			for (int point : crossoverPoints) {
+				if (switchParent) {
+					newGenes1 += genes2.substr(lastPoint, point - lastPoint);
+					newGenes2 += genes1.substr(lastPoint, point - lastPoint);
+				} else {
+					newGenes1 += genes1.substr(lastPoint, point - lastPoint);
+					newGenes2 += genes2.substr(lastPoint, point - lastPoint);
+				}
+				switchParent = !switchParent;
+				lastPoint = point;
+			}
+			// Add remaining genes
+			newGenes1 += switchParent ? genes2.substr(lastPoint) : genes1.substr(lastPoint);
+			newGenes2 += switchParent ? genes1.substr(lastPoint) : genes2.substr(lastPoint);
+
 			
 
-
-			
 			return std::make_pair(IndividualType(newGenes1), IndividualType(newGenes2));
 		}
 		void mutation(IndividualType& i){
@@ -117,33 +163,23 @@ class GA{
 		}
 
 	public:
-		GA( std::function<IndividualType()> generateValidIndividual, 
-			std::function<float(IndividualType)> calculateFitness,
-			std::function<bool(IndividualType)> isViable,
-			int populationSize, float mutationRate, float elitismRate)
+		
+		GA( int populationSize, float mutationRate, float elitismRate)
 			{
-				this->generateValidIndividual = generateValidIndividual;
-				this->calculateFitness = calculateFitness;
-				this->isViable = isViable;
 				this->populationSize = populationSize;
 				this->mutationRate = mutationRate;
 				this->elitismRate = elitismRate;
 
-				initializePopulation();
+				//initializePopulation();
 			}
 
-		GA(std::function<IndividualType()> generateValidIndividual, 
-			std::function<float(IndividualType)> calculateFitness,
-			std::function<bool(IndividualType)> isViable)
+		GA()
 			{
-				this->generateValidIndividual = generateValidIndividual;
-				this->calculateFitness = calculateFitness;
-				this->isViable = isViable;
 				this->populationSize = 100;
 				this->mutationRate = 0.01;
 				this->elitismRate = 0.1;
 
-				initializePopulation();
+				//initializePopulation();
 			}
 
 		void run(int g){
