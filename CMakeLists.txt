@@ -17,27 +17,6 @@ target_include_directories(libGA INTERFACE
 # Set compiler optimization flags
 target_compile_options(libGA INTERFACE -O2)
 
-# Add executable for testing
-add_executable(testExecutable test/test.cpp)
-target_link_libraries(testExecutable PRIVATE libGA)
-
-# Set the output directory for the test executable
-set_target_properties(testExecutable PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/bin
-)
-
-# You can add additional compiler options or flags here if needed
-
-# Optional: Install the library
-install(TARGETS libGA
-    EXPORT libGATargets
-    ARCHIVE DESTINATION lib
-    LIBRARY DESTINATION lib
-    RUNTIME DESTINATION bin
-    INCLUDES DESTINATION include
-)
-
-install(DIRECTORY include/ DESTINATION include)
 
 # Optional: Export the library targets
 export(TARGETS libGA FILE libGATargets.cmake)
