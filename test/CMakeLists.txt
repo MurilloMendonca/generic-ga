@@ -1,3 +1,3 @@
-add_executable (demo demo.cpp)
-target_link_libraries (demo libGA)
-add_test (demo demo)
+add_executable (demoGA demo.cpp)
+target_link_libraries (demoGA libGA)
+add_test (demoGA demoGA)
