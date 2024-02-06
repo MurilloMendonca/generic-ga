@@ -1,11 +1,28 @@
 #include "../include/GA.hpp"
 #include "../include/Helper.hpp"
 #include "../include/Individual.hpp"
+#include "../include/ParallelGA.hpp"
 #include <chrono>
 #include <functional>
 #include <iostream>
 #include <random>
 using namespace std;
+
+auto individualGenerator = []() {
+  std::random_device rd;
+  std::mt19937 gen(rd());
+  std::uniform_real_distribution<> dis(0, 10);
+  return Individual<float>(dis(gen));
+};
+auto fitnessCalc = [](const Individual<float> &individual) {
+  const float x = individual.getPhenotype();
+  /* this_thread::sleep_for(chrono::milliseconds(1)); */
+  return sin(x) * sin(2 * x + 5);
+};
+auto isViableFunc = [](const Individual<float> &individual) {
+  const float x = individual.getPhenotype();
+  return x >= 0 && x <= 10;
+};
 
 bool testGrayConversion() {
   float a = 0.5463;
@@ -59,18 +76,14 @@ class ConcreteFitnessStrategy
     : public IFitnessCalculationStrategy<Individual<float>> {
 public:
   float calculateFitness(const Individual<float> &individual) override {
-    // Implement fitness calculation logic here
-    const float x = individual.getPhenotype();
-    return sin(x) * sin(2 * x + 5);
+    return fitnessCalc(individual);
   }
 };
 
 class ConcreteViabilityStrategy : public IViabilityStrategy<Individual<float>> {
 public:
   bool isViable(const Individual<float> &individual) override {
-    // Implement viability check logic here
-    const float x = individual.getPhenotype();
-    return x >= 0 && x <= 10;
+      return isViableFunc(individual);
   }
 };
 
@@ -78,11 +91,7 @@ class ConcreteIndividualGenerationStrategy
     : public IIndividualGenerationStrategy<Individual<float>> {
 public:
   Individual<float> generateIndividual() override {
-    // Implement individual generation logic here
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_real_distribution<> dis(0, 10);
-    return Individual<float>(dis(gen));
+      return individualGenerator();
   }
 };
 
@@ -117,21 +126,6 @@ bool testOOPWithInterfaces() {
 }
 
 bool testOOPWithLambdas() {
-  auto individualGenerator = []() {
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_real_distribution<> dis(0, 10);
-    return Individual<float>(dis(gen));
-  };
-  auto fitnessCalc = [](const Individual<float> &individual) {
-    const float x = individual.getPhenotype();
-    return sin(x) * sin(2 * x + 5);
-  };
-  auto isViableFunc = [](const Individual<float> &individual) {
-    const float x = individual.getPhenotype();
-    return x >= 0 && x <= 10;
-  };
-
   GA<Individual<float>> ga(fitnessCalc, isViableFunc, individualGenerator, 100,
                            0.1, 0.1);
   auto bestIndividual = ga.getBestIndividual();
@@ -150,21 +144,6 @@ bool testOOPWithLambdas() {
 }
 
 bool testFunctional() {
-  auto individualGenerator = []() {
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_real_distribution<> dis(0, 10);
-    return Individual<float>(dis(gen));
-  };
-  auto fitnessCalc = [](const Individual<float> &individual) {
-    const float x = individual.getPhenotype();
-    return sin(x) * sin(2 * x + 5);
-  };
-  auto isViableFunc = [](const Individual<float> &individual) {
-    const float x = individual.getPhenotype();
-    return x >= 0 && x <= 10;
-  };
-
   auto population = FunctionalGA::initializePopulation<Individual<float>>(
       individualGenerator, 100);
 
@@ -190,6 +169,28 @@ bool testFunctional() {
             FunctionalGA::selectParents<Individual<float>>(population, 100 / 3),
             100),
         1.1);
+  }
+
+  std::cout << "Best individual: " << bestIndividual.getPhenotype() << " - "
+            << bestIndividual.getFitness() << std::endl;
+  return bestIndividual.getFitness() > 0.98;
+}
+
+bool testParallelGA() {
+  FloatGenotypePhenotypeStrategy *strategy =
+      new FloatGenotypePhenotypeStrategy();
+  Individual<float>::setStrategy(strategy);
+
+  ParallelGA<Individual<float>> ga(10, fitnessCalc, isViableFunc,
+                                   individualGenerator, 100, 0.1, 0.1);
+  auto bestIndividual = ga.getBestIndividual();
+  for (int i = 0; i < 100; i++) {
+    ga.runWithThreads(1);
+    auto genBestIndividual = ga.getBestIndividual();
+    bestIndividual = std::max(bestIndividual, genBestIndividual,
+                              [](const auto &lhs, const auto &rhs) {
+                                return lhs.getFitness() < rhs.getFitness();
+                              });
   }
 
   std::cout << "Best individual: " << bestIndividual.getPhenotype() << " - "
@@ -244,6 +245,21 @@ int main() {
   std::cout << "============ Functional Test ============" << std::endl;
   start = std::chrono::high_resolution_clock::now();
   testFunctional();
+  end = std::chrono::high_resolution_clock::now();
+  if (result) {
+    std::cout << "Test passed" << std::endl;
+  } else {
+    std::cout << "Test failed" << std::endl;
+  }
+  std::cout << "Time: "
+            << std::chrono::duration_cast<std::chrono::milliseconds>(end -
+                                                                     start)
+                   .count()
+            << "ms" << std::endl;
+
+  std::cout << "============ Parallel GA Test ============" << std::endl;
+  start = std::chrono::high_resolution_clock::now();
+  result = testParallelGA();
   end = std::chrono::high_resolution_clock::now();
   if (result) {
     std::cout << "Test passed" << std::endl;

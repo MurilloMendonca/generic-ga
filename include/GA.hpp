@@ -36,7 +36,8 @@ template <typename IndividualType,
           typename IndividualGenerationStrategy =
               IIndividualGenerationStrategy<IndividualType>>
 class GA {
-private:
+protected:
+
   std::vector<IndividualType> population;
   float mutationRate;
   float elitismRate;
