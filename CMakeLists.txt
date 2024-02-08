@@ -14,6 +14,8 @@ target_include_directories(libGA INTERFACE
     $<INSTALL_INTERFACE:include>
 )
 
+target_link_libraries(libGA INTERFACE ${Boost_ASIO_LIBRARY})
+
 # Set compiler optimization flags
 target_compile_options(libGA INTERFACE -O2)
 
@@ -34,4 +36,3 @@ write_basic_package_version_file(
 install(FILES libGAConfig.cmake ${CMAKE_CURRENT_BINARY_DIR}/libGAConfigVersion.cmake
     DESTINATION lib/cmake/libGA
 )
-

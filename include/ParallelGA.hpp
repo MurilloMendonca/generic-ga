@@ -1,5 +1,6 @@
 #include "GA.hpp"
 #include <thread>
+#include <boost/asio.hpp>
 template <typename IndividualType,
           typename FitnessCalculationStrategy =
               IFitnessCalculationStrategy<IndividualType>,
@@ -10,6 +11,7 @@ class ParallelGA : public GA<IndividualType, FitnessCalculationStrategy,
                              ViabilityStrategy, IndividualGenerationStrategy> {
 private:
   int numThreads;
+  std::unique_ptr<boost::asio::thread_pool> pool;
 
 public:
   ParallelGA(int numThreads,
@@ -21,6 +23,7 @@ public:
                                          viabilityStrategy,
                                          individualGenerationStrategy) {
     this->numThreads = numThreads;
+    pool = std::make_unique<boost::asio::thread_pool>(numThreads);
   }
   ParallelGA(int numThreads,
              std::function<float(const IndividualType &)> fitnessCalculationStrategy,
@@ -33,10 +36,10 @@ public:
                                          populationSize, mutationRate,
                                          elitismRate) {
     this->numThreads = numThreads;
+    pool = std::make_unique<boost::asio::thread_pool>(numThreads);
   }
 
   void parallelFitnessCalculation() {
-    std::vector<std::thread> threads;
     int populationSize = this->population.size();
     int chunkSize = populationSize / numThreads;
     for (int i = 0; i < numThreads; i++) {
@@ -45,7 +48,7 @@ public:
       if (i == numThreads - 1) {
         end = populationSize;
       }
-      threads.push_back(std::thread([this, start, end]() {
+      boost::asio::post(*pool,[this, start, end]() {
         for (int j = start; j < end; j++) {
         if (this->viabilityStrategy->isViable(this->population[j].getPhenotype())) {
           this->population[j].setFitness(
@@ -55,11 +58,9 @@ public:
           this->population[j].setFitness(0);
         }
         }
-      }));
+      });
     }
-    for (int i = 0; i < numThreads; i++) {
-      threads[i].join();
-    }
+    pool->join();
   }
   void runWithThreads(int g) {
     for (int i = 0; i < g; i++) {
