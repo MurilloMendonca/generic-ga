@@ -15,13 +15,16 @@ private:
 
 public:
   ParallelGA(int numThreads,
-             FitnessCalculationStrategy fitnessCalculationStrategy,
-             ViabilityStrategy viabilityStrategy,
-             IndividualGenerationStrategy individualGenerationStrategy)
+             std::unique_ptr<FitnessCalculationStrategy> fitnessCalculationStrategy,
+             std::unique_ptr<ViabilityStrategy> viabilityStrategy,
+             std::unique_ptr<IndividualGenerationStrategy> individualGenerationStrategy,
+             int populationSize, float mutationRate, float elitismRate)
       : GA<IndividualType, FitnessCalculationStrategy, ViabilityStrategy,
-           IndividualGenerationStrategy>(fitnessCalculationStrategy,
-                                         viabilityStrategy,
-                                         individualGenerationStrategy) {
+           IndividualGenerationStrategy>(std::move(fitnessCalculationStrategy),
+                                       std::move(viabilityStrategy),
+                                       std::move(individualGenerationStrategy),
+                                       populationSize, mutationRate,
+                                       elitismRate) {
     this->numThreads = numThreads;
     pool = std::make_unique<boost::asio::thread_pool>(numThreads);
   }
